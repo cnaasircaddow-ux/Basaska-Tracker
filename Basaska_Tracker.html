@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="so">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14532d">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Basaska Tracker</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#17211b;background:#f4f7f4}
+*{box-sizing:border-box}body{margin:0;padding:16px;max-width:720px;margin-inline:auto}
+header{padding:18px 4px 12px}h1{margin:0 0 5px;font-size:1.7rem}p{line-height:1.45}
+.card{background:white;border:1px solid #d7e1d9;border-radius:16px;padding:16px;margin:12px 0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}.stat{font-size:2rem;font-weight:800}.muted{color:#5c6c60;font-size:.9rem}
+label{display:block;font-weight:650;margin:12px 0 6px}
+input{width:100%;font-size:16px;padding:13px;border:1px solid #b8c8bc;border-radius:10px;background:white}
+button{font-size:16px;font-weight:700;border:1px solid #b8c8bc;border-radius:10px;padding:12px 14px;background:white;color:#17211b;min-height:46px}
+.primary{background:#166534;color:white;border-color:#166534;width:100%;margin-top:12px}
+.row{padding:12px 0;border-bottom:1px solid #e1e8e2;display:flex;justify-content:space-between;gap:12px}
+.row:last-child{border-bottom:0}.plate{font-weight:800;font-size:1.05rem}.badge{font-size:.78rem;border:1px solid #d7e1d9;border-radius:20px;padding:4px 8px;white-space:nowrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions button{flex:1}
+#message{margin-top:12px}.good{color:#166534;font-weight:700}.warn{color:#9a3412;font-weight:700}
+small{color:#5c6c60}
+</style>
+</head>
+<body>
+<header><h1>🚌 Basaska Tracker</h1><p class="muted">Diiwaangeli taargooyinka, ogow basaska cusub, lana soco maritaannada.</p></header>
+<div class="stats">
+ <section class="card"><div class="muted">Basas kala duwan</div><div id="unique" class="stat">0</div></section>
+ <section class="card"><div class="muted">Wadarta maritaannada</div><div id="total" class="stat">0</div></section>
+</div>
+<section class="card">
+<h2>Hubi taargada</h2>
+<label for="plate">Lambarka taargada</label>
+<input id="plate" maxlength="30" placeholder="Tusaale: ABC 123" autocomplete="off">
+<label for="photo">Ama sawir taargada (ikhtiyaari)</label>
+<input id="photo" type="file" accept="image/*" capture="environment">
+<small>App-kan sawirka si toos ah ugama akhriyo taargada. Sawir qaad kadib lambarka gacanta ku qor.</small>
+<button id="check" class="primary">Hubi oo diiwaangeli maritaankan</button>
+<div id="message" aria-live="polite"></div>
+</section>
+<section class="card">
+<h2>Diiwaanka basaska</h2>
+<div id="records"><p class="muted">Weli bas lama diiwaangelin.</p></div>
+<div class="actions"><button id="export">Soo dejiso CSV</button><button id="backup">Kaydi nuqul</button><button id="restore">Soo celi nuqul</button><input id="restorefile" type="file" accept="application/json" hidden></div>
+<p><small>Xogtu waxay ku kaydsan tahay telefoonkan/browser-kan. Ha nadiifin xogta browser-ka haddii aad rabto inaad ilaaliso diiwaanka; samee nuqul kayd ah mararka qaarkood.</small></p>
+<button id="clear">Tirtir dhammaan diiwaanka</button>
+</section>
+<section class="card"><h3>Waxa app-ku qabanayo</h3><p>Taargo cusub marka ugu horreysa la geliyo wuxuu ku daraa bas cusub. Marka taargo hore la geliyo mar kale, tirada maritaannada ayaa kordhaysa. Tani ma aha tirin otomaatig ah oo waddada ka dhacaysa; qof ayaa sawiraya oo gelinaya taargada.</p><p class="muted">Si app-ka loogu rakibo sida app Android ah, faylasha waa in lagu daabaco bog HTTPS ah, kadib Chrome laga doorto “Install app” ama “Add to Home screen”.</p></section>
+<script>
+const $=id=>document.getElementById(id);
+const KEY='basaskaTrackerRecordsV1';
+let records={};
+try{records=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){records={};}
+function save(){localStorage.setItem(KEY,JSON.stringify(records));}
+function now(){return new Date().toLocaleString('so-SO');}
+function render(){
+ const list=Object.values(records).sort((a,b)=>b.lastMs-a.lastMs);
+ $('unique').textContent=list.length;
+ $('total').textContent=list.reduce((s,r)=>s+r.count,0);
+ const wrap=$('records');wrap.replaceChildren();
+ if(!list.length){const p=document.createElement('p');p.className='muted';p.textContent='Weli bas lama diiwaangelin.';wrap.append(p);return;}
+ for(const r of list){const row=document.createElement('div');row.className='row';const left=document.createElement('div');const p=document.createElement('div');p.className='plate';p.textContent=r.plate;const d=document.createElement('div');d.className='muted';d.textContent='Ugu horreysay: '+r.first+' · Ugu dambaysay: '+r.last;left.append(p,d);const right=document.createElement('div');right.style.textAlign='right';const c=document.createElement('div');c.style.fontWeight='750';c.textContent=r.count+' mar';const badge=document.createElement('span');badge.className='badge';badge.textContent='La yaqaan';right.append(c,badge);row.append(left,right);wrap.append(row);}
+}
+$('check').addEventListener('click',()=>{
+ const plate=$('plate').value.trim().toUpperCase().replace(/\s+/g,' ');
+ const msg=$('message');msg.replaceChildren();
+ if(!plate){msg.textContent='Fadlan geli lambarka taargada.';$('plate').focus();return;}
+ if(!/[A-Z0-9]/.test(plate)){msg.textContent='Taargadu waa inay leedahay xarfo ama tirooyin.';return;}
+ const t=now(),ms=Date.now(),isNew=!records[plate];
+ if(isNew)records[plate]={plate,count:1,first:t,last:t,lastMs:ms};
+ else {records[plate].count++;records[plate].last=t;records[plate].lastMs=ms;}
+ save();const box=document.createElement('div');box.className=isNew?'good':'warn';box.textContent=(isNew?'🆕 BAS CUSUB OO LA HELAY! ':'✅ Bas hore loo yaqaan. ')+'Taargo: '+plate+' · Maritaanno: '+records[plate].count;msg.append(box);$('plate').value='';render();
+});
+$('export').addEventListener('click',()=>{
+ const rows=[['Taargo','Tirada maritaannada','Markii ugu horreysay','Ugu dambaysay'],...Object.values(records).map(r=>[r.plate,r.count,r.first,r.last])];
+ const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='basaska-diiwaanka.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+$('backup').addEventListener('click',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(records,null,2)],{type:'application/json'}));a.download='basaska-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+$('restore').addEventListener('click',()=>$('restorefile').click());
+$('restorefile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x||typeof x!=='object'||Array.isArray(x))throw Error();records=x;save();render();alert('Nuqulkii waa la soo celiyey.');}catch(err){alert('Faylka nuqulku ma saxna.');}e.target.value='';});
+$('clear').addEventListener('click',()=>{if(confirm('Ma hubtaa inaad tirtirayso dhammaan diiwaanka? Marka hore samee nuqul kayd ah haddii loo baahdo.')){records={};save();render();$('message').textContent='Diiwaanka waa la nadiifiyey.';}});
+render();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
